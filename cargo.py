@@ -1,114 +1,80 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
 
-# ----------------------------
-# Streamlit App Configuration
-# ----------------------------
-st.set_page_config(
-    page_title="KPA Cargo Forecast",
-    page_icon="📦",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Election Forecasting", layout="wide")
+st.title("🗳 LSTM Election Forecasting Dashboard")
 
-# ----------------------------
-# Title and Instructions
-# ----------------------------
-st.title("📦 Kenya Ports Authority - Cargo Volume Forecasting Dashboard")
-st.markdown("""
-This application allows you to upload and visualize cargo volume data for forecasting purposes.
-Please ensure your CSV file contains at least two columns:
-- **Date** (in a recognizable date format like YYYY-MM-DD)
-- **CargoVolume** (numerical values representing cargo volume per date)
-
----
-""")
-
-# ----------------------------
-# File Uploader
-# ----------------------------
 uploaded_file = st.file_uploader(
-    label="📁 Upload a CSV file with your cargo data",
-    type="csv",
-    help="Ensure your CSV has 'Date' and 'CargoVolume' columns."
+    "Upload Historical Polling CSV (Date + Party Vote Shares)", type="csv"
 )
 
-# ----------------------------
-# Data Handling and Validation
-# ----------------------------
+def create_sequences(data, sequence_length):
+    X, y = [], []
+    for i in range(len(data) - sequence_length):
+        X.append(data[i:i+sequence_length])
+        y.append(data[i+sequence_length])
+    return np.array(X), np.array(y)
+
 if uploaded_file is not None:
-    try:
-        # Read the uploaded CSV file into a pandas DataFrame
-        df = pd.read_csv(uploaded_file)
+    df = pd.read_csv(uploaded_file)
+    
+    if "Date" not in df.columns:
+        st.error("Dataset must contain 'Date' column.")
+    else:
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.sort_values("Date")
+        st.subheader("Preview Dataset")
+        st.dataframe(df.head())
 
-        # Display raw data
-        st.subheader("📊 Raw Data Preview")
-        st.dataframe(df.head(10), use_container_width=True)
+        # Select parties to forecast
+        parties = st.multiselect(
+            "Select Parties to Forecast", 
+            options=[c for c in df.columns if c != "Date"],
+            default=[c for c in df.columns if c != "Date"]
+        )
 
-        # Check for required columns
-        if 'Date' not in df.columns or 'CargoVolume' not in df.columns:
-            st.error("❌ The uploaded CSV must contain 'Date' and 'CargoVolume' columns.")
-        else:
-            # Try to convert the 'Date' column to datetime
-            try:
-                df['Date'] = pd.to_datetime(df['Date'])
-            except Exception as date_error:
-                st.error(f"⚠️ Error parsing 'Date' column: {date_error}")
-                st.stop()
+        sequence_length = st.slider("Sequence Length (months/weeks)", 2, 24, 6)
+        forecast_periods = st.slider("Forecast Periods (future steps)", 1, 12, 3)
 
-            # Sort the data chronologically
-            df = df.sort_values('Date')
+        predictions_dict = {}
 
-            # Remove any missing values
-            df = df.dropna(subset=['Date', 'CargoVolume'])
+        for party in parties:
+            votes = df[party].values.reshape(-1,1)
+            scaler = MinMaxScaler()
+            votes_scaled = scaler.fit_transform(votes)
 
-            # Set Date as index for time-series plotting
-            df.set_index('Date', inplace=True)
+            X, y = create_sequences(votes_scaled, sequence_length)
 
-            # Ensure CargoVolume is numeric
-            try:
-                df['CargoVolume'] = pd.to_numeric(df['CargoVolume'])
-            except Exception as conv_error:
-                st.error(f"⚠️ Error converting 'CargoVolume' to numeric: {conv_error}")
-                st.stop()
+            # Train-test split
+            split = int(len(X)*0.8)
+            X_train, X_test = X[:split], X[split:]
+            y_train, y_test = y[:split], y[split:]
 
-            # ----------------------------
-            # Line Chart Visualization
-            # ----------------------------
-            st.subheader("📈 Historical Cargo Volume Trend")
-            st.line_chart(df['CargoVolume'])
+            # Build LSTM
+            model = Sequential()
+            model.add(LSTM(50, input_shape=(sequence_length,1)))
+            model.add(Dense(1))
+            model.compile(optimizer="adam", loss="mse")
+            model.fit(X_train, y_train, epochs=20, batch_size=8, verbose=0)
 
-            # ----------------------------
-            # Basic Stats Summary
-            # ----------------------------
-            st.subheader("📌 Summary Statistics")
-            st.write(df['CargoVolume'].describe())
+            # Forecast future
+            last_seq = votes_scaled[-sequence_length:]
+            future_preds = []
+            for _ in range(forecast_periods):
+                next_pred = model.predict(last_seq.reshape(1,sequence_length,1))
+                future_preds.append(next_pred[0,0])
+                last_seq = np.append(last_seq[1:], next_pred, axis=0)
 
-            # ----------------------------
-            # Optional: Filter by Year or Range
-            # ----------------------------
-            st.subheader("🔍 Optional: Filter by Date Range")
-            min_date = df.index.min()
-            max_date = df.index.max()
+            future_preds = scaler.inverse_transform(np.array(future_preds).reshape(-1,1))
+            predictions_dict[party] = future_preds.flatten()
 
-            start_date, end_date = st.date_input(
-                "Select date range:",
-                value=[min_date, max_date],
-                min_value=min_date,
-                max_value=max_date
-            )
-
-            if start_date and end_date:
-                filtered_df = df.loc[start_date:end_date]
-
-                st.markdown(f"### 📅 Filtered Data from {start_date} to {end_date}")
-                st.dataframe(filtered_df, use_container_width=True)
-
-                st.subheader("📉 Filtered Cargo Volume Trend")
-                st.line_chart(filtered_df['CargoVolume'])
-
-    except Exception as e:
-        st.error(f"🚨 An unexpected error occurred while processing your file: {e}")
-
+        st.subheader("Forecasted Vote Shares")
+        forecast_df = pd.DataFrame(predictions_dict)
+        st.line_chart(forecast_df)
+        st.write(forecast_df)
 else:
-    st.info("👈 Please upload a CSV file to get started.")
+    st.info("Upload a CSV file with historical polling data to begin.")
