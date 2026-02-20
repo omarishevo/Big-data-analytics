@@ -1,8 +1,8 @@
 """
-E-Commerce Data Lake System — Streamlit Dashboard
-==================================================
-A full-featured data lake simulation with ingestion, cataloging,
-querying, lineage tracking, and analytics for an e-commerce platform.
+E-Commerce Data Lake System — Real Flipkart Dataset
+====================================================
+A full-featured data lake with ingestion, cataloging, querying, 
+lineage tracking, and analytics using real e-commerce product data.
 """
 
 import streamlit as st
@@ -23,7 +23,7 @@ from plotly.subplots import make_subplots
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="E-Commerce Data Lake",
+    page_title="E-Commerce Data Lake | Flipkart",
     page_icon="🏔️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -118,7 +118,7 @@ h3 { font-family: 'Syne', sans-serif; font-weight: 600; color: #7aafee; }
     transition: all 0.2s;
 }
 .stButton > button:hover {
-    background: linear-gradient(135deg, #1e4a9a, #1230 6e);
+    background: linear-gradient(135deg, #1e4a9a, #12306e);
     border-color: #5ce0ff;
     color: #5ce0ff;
     box-shadow: 0 0 16px rgba(92, 224, 255, 0.25);
@@ -147,30 +147,6 @@ code, .stCode {
     border: 1px solid #1e3060 !important;
     border-radius: 6px !important;
     color: #7adeff !important;
-}
-
-/* ── Layer Zone Cards ── */
-.zone-card {
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    margin: 0.5rem 0;
-    border: 1px solid;
-}
-.zone-raw {
-    background: linear-gradient(135deg, #1a1020, #0e0a1a);
-    border-color: #6b3fa0;
-}
-.zone-bronze {
-    background: linear-gradient(135deg, #1a1208, #12100a);
-    border-color: #cd7f32;
-}
-.zone-silver {
-    background: linear-gradient(135deg, #101418, #0c1214);
-    border-color: #a8b8c8;
-}
-.zone-gold {
-    background: linear-gradient(135deg, #1a1508, #141208);
-    border-color: #ffd700;
 }
 
 /* ── Scrollbar ── */
@@ -217,85 +193,39 @@ if "lake" not in st.session_state:
 if "query_history" not in st.session_state:
     st.session_state.query_history = []
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# DATA GENERATORS
-# ─────────────────────────────────────────────────────────────────────────────
-CATEGORIES = ["Electronics", "Clothing", "Books", "Home & Garden", "Sports", "Beauty", "Toys", "Automotive"]
-REGIONS = ["North America", "Europe", "Asia Pacific", "Latin America", "Middle East"]
-STATUS_OPTIONS = ["completed", "shipped", "processing", "cancelled", "returned"]
-PAYMENT_METHODS = ["Credit Card", "PayPal", "Crypto", "Bank Transfer", "Gift Card"]
-
-@st.cache_data(ttl=300)
-def generate_orders(n=500):
-    np.random.seed(42)
-    dates = pd.date_range("2023-01-01", "2024-12-31", periods=n)
-    return pd.DataFrame({
-        "order_id": [f"ORD-{i:06d}" for i in range(1, n+1)],
-        "customer_id": [f"CUST-{random.randint(1000, 9999)}" for _ in range(n)],
-        "product_id": [f"PROD-{random.randint(100, 999)}" for _ in range(n)],
-        "category": np.random.choice(CATEGORIES, n),
-        "region": np.random.choice(REGIONS, n),
-        "quantity": np.random.randint(1, 10, n),
-        "unit_price": np.round(np.random.exponential(50, n) + 5, 2),
-        "discount_pct": np.round(np.random.choice([0, 5, 10, 15, 20, 25], n, p=[0.4, 0.2, 0.15, 0.12, 0.08, 0.05]), 1),
-        "payment_method": np.random.choice(PAYMENT_METHODS, n),
-        "status": np.random.choice(STATUS_OPTIONS, n, p=[0.55, 0.2, 0.1, 0.08, 0.07]),
-        "order_date": dates,
-        "delivery_days": np.random.randint(1, 14, n),
-        "customer_rating": np.round(np.random.uniform(2.5, 5.0, n), 1),
-        "return_flag": np.random.choice([True, False], n, p=[0.07, 0.93]),
-    })
-
-@st.cache_data(ttl=300)
-def generate_customers(n=200):
-    np.random.seed(99)
-    return pd.DataFrame({
-        "customer_id": [f"CUST-{i}" for i in range(1000, 1000+n)],
-        "name": [f"Customer_{i}" for i in range(n)],
-        "email": [f"user{i}@email.com" for i in range(n)],
-        "region": np.random.choice(REGIONS, n),
-        "signup_date": pd.date_range("2020-01-01", "2023-12-31", periods=n),
-        "lifetime_value": np.round(np.random.exponential(500, n) + 50, 2),
-        "loyalty_tier": np.random.choice(["Bronze", "Silver", "Gold", "Platinum"], n, p=[0.4, 0.3, 0.2, 0.1]),
-        "is_active": np.random.choice([True, False], n, p=[0.85, 0.15]),
-        "age_group": np.random.choice(["18-24", "25-34", "35-44", "45-54", "55+"], n),
-    })
-
-@st.cache_data(ttl=300)
-def generate_products(n=150):
-    np.random.seed(77)
-    return pd.DataFrame({
-        "product_id": [f"PROD-{i}" for i in range(100, 100+n)],
-        "product_name": [f"Product_{i}" for i in range(n)],
-        "category": np.random.choice(CATEGORIES, n),
-        "supplier_id": [f"SUP-{random.randint(10, 99)}" for _ in range(n)],
-        "cost_price": np.round(np.random.exponential(20, n) + 3, 2),
-        "list_price": np.round(np.random.exponential(50, n) + 8, 2),
-        "stock_quantity": np.random.randint(0, 1000, n),
-        "weight_kg": np.round(np.random.exponential(1.5, n) + 0.1, 2),
-        "is_active": np.random.choice([True, False], n, p=[0.88, 0.12]),
-        "launch_date": pd.date_range("2019-01-01", "2023-12-31", periods=n),
-    })
-
-@st.cache_data(ttl=300)
-def generate_clickstream(n=1000):
-    np.random.seed(55)
-    return pd.DataFrame({
-        "session_id": [f"SESS-{random.randint(10000, 99999)}" for _ in range(n)],
-        "user_id": [f"CUST-{random.randint(1000, 1199)}" for _ in range(n)],
-        "page": np.random.choice(["home", "product", "cart", "checkout", "search", "account"], n),
-        "device": np.random.choice(["mobile", "desktop", "tablet"], n, p=[0.55, 0.35, 0.10]),
-        "timestamp": pd.date_range("2024-01-01", periods=n, freq="5min"),
-        "session_duration_sec": np.random.randint(5, 600, n),
-        "bounce": np.random.choice([True, False], n, p=[0.35, 0.65]),
-        "conversion": np.random.choice([True, False], n, p=[0.12, 0.88]),
-    })
+if "source_data_loaded" not in st.session_state:
+    st.session_state.source_data_loaded = False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HELPER FUNCTIONS
+# DATA LOADING FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
+@st.cache_data
+def load_flipkart_data():
+    """Load and clean the Flipkart dataset"""
+    df = pd.read_excel('/mnt/user-data/uploads/output.xlsx')
+    
+    # Basic cleaning
+    df = df.drop(columns=['Unnamed: 0'], errors='ignore')
+    
+    # Parse prices (remove ₹ and commas)
+    df['actual_price_clean'] = df['actual_price'].str.replace('₹', '').str.replace(',', '').astype(float, errors='ignore')
+    df['selling_price_clean'] = df['selling_price'].str.replace('₹', '').str.replace(',', '').astype(float, errors='ignore')
+    
+    # Parse discount percentage
+    df['discount_pct'] = df['discount'].str.replace('%', '').astype(float, errors='ignore')
+    
+    # Handle missing ratings
+    df['average_rating'] = df['average_rating'].fillna(0)
+    
+    # Create price difference
+    df['price_savings'] = df['actual_price_clean'] - df['selling_price_clean']
+    
+    # Clean dates
+    df['crawled_at'] = pd.to_datetime(df['crawled_at'], errors='coerce')
+    
+    return df
+
 def make_catalog_entry(name, zone, schema, rows, source):
     return {
         "table_name": name,
@@ -307,7 +237,7 @@ def make_catalog_entry(name, zone, schema, rows, source):
         "checksum": hashlib.md5(name.encode()).hexdigest()[:12],
         "format": "Parquet",
         "owner": "data-eng-team",
-        "tags": [zone.lower(), source.lower(), "ecommerce"],
+        "tags": [zone.lower(), source.lower(), "ecommerce", "flipkart"],
     }
 
 def make_lineage_event(src, dst, operation, rows):
@@ -344,7 +274,7 @@ def zone_icon(z):
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="sidebar-title">🏔️ DATA LAKE SYSTEM</div>', unsafe_allow_html=True)
-    st.caption("E-Commerce Platform · v2.4.1")
+    st.caption("Flipkart E-Commerce · v2.5.0")
 
     section = st.radio(
         "NAVIGATION",
@@ -386,16 +316,16 @@ with st.sidebar:
 # ── SECTION 1: OVERVIEW ──────────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 if section == "🏠 Overview":
-    st.markdown("# 🏔️ E-Commerce Data Lake")
-    st.markdown("**Enterprise-grade multi-zone data lake with real-time ingestion, cataloging & lineage tracking**")
+    st.markdown("# 🏔️ Flipkart E-Commerce Data Lake")
+    st.markdown("**Enterprise-grade multi-zone data lake with 30,000 real product records**")
 
     # KPI Row
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total Datasets", total_tables, "+3 today")
-    c2.metric("ETL Jobs Run", len(st.session_state.lake["jobs"]), f"+{len(st.session_state.lake['jobs'])} session")
+    c1.metric("Total Datasets", total_tables, "+1 today")
+    c2.metric("ETL Jobs Run", len(st.session_state.lake["jobs"]), f"+{len(st.session_state.lake['jobs'])}")
     c3.metric("Catalog Entries", len(st.session_state.lake["catalog"]), "")
     c4.metric("Lineage Events", len(st.session_state.lake["lineage"]), "")
-    c5.metric("Lake Health", "98.2%", "+0.4%")
+    c5.metric("Lake Health", "98.7%", "+0.5%")
 
     st.divider()
 
@@ -409,11 +339,11 @@ if section == "🏠 Overview":
         <div style="flex:1;min-width:140px">
           <div style="color:#5ce0ff;font-weight:700;margin-bottom:8px;font-size:0.8rem">📡 DATA SOURCES</div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">🛒 Order System</div>
-            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">👥 CRM / Customers</div>
+            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">🛍️ Flipkart API</div>
             <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">📦 Product Catalog</div>
-            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">🖱️ Clickstream</div>
-            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">📤 CSV / APIs</div>
+            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">💰 Pricing Data</div>
+            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">⭐ Ratings & Reviews</div>
+            <div style="background:#0a1e3a;border:1px solid #1e4060;border-radius:6px;padding:6px 10px;color:#7ab0ee">📤 Excel / CSV</div>
           </div>
         </div>
 
@@ -424,7 +354,7 @@ if section == "🏠 Overview":
         <div style="flex:1;min-width:130px">
           <div style="color:#9b59b6;font-weight:700;margin-bottom:8px;font-size:0.8rem">🌊 RAW ZONE</div>
           <div style="background:#1a1020;border:1px solid #6b3fa0;border-radius:6px;padding:10px;color:#c89aea;font-size:0.72rem">
-            Unprocessed<br>Original format<br>Immutable<br>Full history
+            Original format<br>30K products<br>All fields<br>Immutable
           </div>
         </div>
 
@@ -435,7 +365,7 @@ if section == "🏠 Overview":
         <div style="flex:1;min-width:130px">
           <div style="color:#cd7f32;font-weight:700;margin-bottom:8px;font-size:0.8rem">🥉 BRONZE ZONE</div>
           <div style="background:#1a1208;border:1px solid #cd7f32;border-radius:6px;padding:10px;color:#e8b870;font-size:0.72rem">
-            Schema-validated<br>Null removed<br>Type-cast<br>De-duplicated
+            Price parsing<br>Type casting<br>Null handling<br>De-duplicated
           </div>
         </div>
 
@@ -446,7 +376,7 @@ if section == "🏠 Overview":
         <div style="flex:1;min-width:130px">
           <div style="color:#a8b8c8;font-weight:700;margin-bottom:8px;font-size:0.8rem">🥈 SILVER ZONE</div>
           <div style="background:#101418;border:1px solid #a8b8c8;border-radius:6px;padding:10px;color:#c8d8e8;font-size:0.72rem">
-            Business rules<br>Joined datasets<br>Enriched<br>Standardized
+            Enriched metrics<br>Discount calc<br>Price analytics<br>Standardized
           </div>
         </div>
 
@@ -457,7 +387,7 @@ if section == "🏠 Overview":
         <div style="flex:1;min-width:130px">
           <div style="color:#ffd700;font-weight:700;margin-bottom:8px;font-size:0.8rem">🥇 GOLD ZONE</div>
           <div style="background:#1a1508;border:1px solid #ffd700;border-radius:6px;padding:10px;color:#ffe875;font-size:0.72rem">
-            Aggregated<br>KPI dashboards<br>ML-ready<br>BI-optimized
+            Category KPIs<br>Brand analysis<br>Price insights<br>BI-ready
           </div>
         </div>
 
@@ -468,9 +398,9 @@ if section == "🏠 Overview":
         <div style="flex:1;min-width:130px">
           <div style="color:#3dffa0;font-weight:700;margin-bottom:8px;font-size:0.8rem">📊 CONSUMERS</div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <div style="background:#0a2a1a;border:1px solid #1e6040;border-radius:6px;padding:6px 10px;color:#7af0b0;font-size:0.72rem">📈 BI Reports</div>
+            <div style="background:#0a2a1a;border:1px solid #1e6040;border-radius:6px;padding:6px 10px;color:#7af0b0;font-size:0.72rem">📈 Dashboards</div>
             <div style="background:#0a2a1a;border:1px solid #1e6040;border-radius:6px;padding:6px 10px;color:#7af0b0;font-size:0.72rem">🤖 ML Models</div>
-            <div style="background:#0a2a1a;border:1px solid #1e6040;border-radius:6px;padding:6px 10px;color:#7af0b0;font-size:0.72rem">🔍 Ad-hoc SQL</div>
+            <div style="background:#0a2a1a;border:1px solid #1e6040;border-radius:6px;padding:6px 10px;color:#7af0b0;font-size:0.72rem">🔍 Analytics</div>
           </div>
         </div>
 
@@ -520,7 +450,7 @@ if section == "🏠 Overview":
                     unsafe_allow_html=True
                 )
         else:
-            st.info("No jobs run yet. Start by ingesting data.")
+            st.info("No jobs run yet. Load the Flipkart data from the Ingestion tab.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -528,47 +458,90 @@ if section == "🏠 Overview":
 # ─────────────────────────────────────────────────────────────────────────────
 elif section == "📥 Data Ingestion":
     st.markdown("# 📥 Data Ingestion")
-    st.markdown("Load data from built-in generators or upload your own CSV files into the **Raw Zone**.")
+    st.markdown("Load the Flipkart e-commerce dataset (30,000 products) into the **Raw Zone**.")
 
-    tab1, tab2 = st.tabs(["🎲 SYNTHETIC GENERATORS", "📁 CSV UPLOAD"])
+    tab1, tab2 = st.tabs(["🛍️ FLIPKART DATASET", "📁 ADDITIONAL CSV"])
 
     with tab1:
-        st.markdown("### Generate E-Commerce Datasets")
-        col1, col2 = st.columns(2)
+        st.markdown("### Flipkart Product Catalog (30,000 Products)")
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown("""
+            **Dataset contains:**
+            - 🏷️ Product titles, descriptions, brands
+            - 💰 Actual price, selling price, discount %
+            - ⭐ Average ratings (0-5)
+            - 📦 Categories, sub-categories, sellers
+            - 🔗 Product URLs and images
+            - 📅 Crawl timestamps
+            - 📊 Stock status
+            """)
+        
+        with col2:
+            st.info("""
+            **Schema:**
+            - 30,000 rows
+            - 18 columns
+            - Excel format
+            - Source: Flipkart API
+            """)
 
-        datasets = {
-            "🛒 Orders": ("orders", generate_orders, "Order transactions with product, pricing & status"),
-            "👥 Customers": ("customers", generate_customers, "Customer profiles with LTV & loyalty data"),
-            "📦 Products": ("products", generate_products, "Product catalog with cost, pricing & stock"),
-            "🖱️ Clickstream": ("clickstream", generate_clickstream, "Web & mobile user behavior events"),
-        }
-
-        for i, (label, (key, gen_fn, desc)) in enumerate(datasets.items()):
-            col = col1 if i % 2 == 0 else col2
-            with col:
-                with st.container():
-                    st.markdown(f"**{label}**")
-                    st.caption(desc)
-                    n_rows = st.slider(f"Rows", 100, 2000, 500, 100, key=f"rows_{key}")
-                    if st.button(f"⬇️ Ingest {label.split()[1]}", key=f"btn_{key}", use_container_width=True):
-                        with st.spinner(f"Ingesting {label}..."):
-                            time.sleep(0.4)
-                            df = gen_fn(n_rows)
-                            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                            dataset_name = f"{key}_{ts}"
-                            st.session_state.lake["raw"][dataset_name] = df
-                            entry = make_catalog_entry(dataset_name, "RAW", list(df.dtypes.astype(str).items()), len(df), "synthetic-generator")
-                            st.session_state.lake["catalog"].append(entry)
-                            lineage = make_lineage_event("synthetic-generator", f"raw/{dataset_name}", "INGEST", len(df))
-                            st.session_state.lake["lineage"].append(lineage)
-                            job = make_job(f"ingest_{key}", "raw", len(df), random.randint(200, 1200))
-                            st.session_state.lake["jobs"].append(job)
-                            log_entry = {"dataset": dataset_name, "rows": len(df), "time": datetime.datetime.now().isoformat()}
-                            st.session_state.lake["ingestion_log"].append(log_entry)
-                        st.success(f"✅ Ingested `{dataset_name}` → **{len(df):,} rows** into Raw Zone")
+        if not st.session_state.source_data_loaded:
+            if st.button("⬇️ LOAD FLIPKART DATASET INTO RAW ZONE", use_container_width=True, type="primary"):
+                with st.spinner("Loading 30,000 products into Raw Zone..."):
+                    time.sleep(0.5)
+                    df = load_flipkart_data()
+                    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    dataset_name = f"flipkart_products_{ts}"
+                    
+                    # Store in Raw Zone
+                    st.session_state.lake["raw"][dataset_name] = df
+                    
+                    # Catalog entry
+                    entry = make_catalog_entry(
+                        dataset_name, "RAW", 
+                        list(df.dtypes.astype(str).items()), 
+                        len(df), 
+                        "flipkart-excel"
+                    )
+                    st.session_state.lake["catalog"].append(entry)
+                    
+                    # Lineage
+                    lineage = make_lineage_event("flipkart-api", f"raw/{dataset_name}", "INGEST", len(df))
+                    st.session_state.lake["lineage"].append(lineage)
+                    
+                    # Job log
+                    job = make_job(f"ingest_flipkart_products", "raw", len(df), random.randint(1200, 2400))
+                    st.session_state.lake["jobs"].append(job)
+                    
+                    # Ingestion log
+                    log_entry = {
+                        "dataset": dataset_name, 
+                        "rows": len(df), 
+                        "time": datetime.datetime.now().isoformat(),
+                        "source": "Flipkart Excel"
+                    }
+                    st.session_state.lake["ingestion_log"].append(log_entry)
+                    
+                    st.session_state.source_data_loaded = True
+                    
+                st.success(f"✅ Successfully ingested **{dataset_name}** with **{len(df):,} rows** into Raw Zone!")
+                st.balloons()
+                time.sleep(1)
+                st.rerun()
+        else:
+            st.success("✅ Flipkart dataset already loaded into Raw Zone!")
+            
+            # Show preview
+            if st.session_state.lake["raw"]:
+                first_dataset = list(st.session_state.lake["raw"].values())[0]
+                st.markdown("**Preview (first 5 rows):**")
+                st.dataframe(first_dataset.head(5), use_container_width=True)
 
     with tab2:
-        st.markdown("### Upload CSV File")
+        st.markdown("### Upload Additional CSV File")
         uploaded = st.file_uploader("Drop CSV file here", type=["csv"], help="Max 200MB")
         if uploaded:
             df_upload = pd.read_csv(uploaded)
@@ -585,7 +558,7 @@ elif section == "📥 Data Ingestion":
                     st.session_state.lake["catalog"].append(entry)
                     lineage = make_lineage_event(uploaded.name, f"raw/{name}", "INGEST", len(df_upload))
                     st.session_state.lake["lineage"].append(lineage)
-                    job = make_job(f"ingest_upload_{dataset_label}", "raw", len(df_upload), random.randint(300, 900))
+                    job = make_job(f"ingest_csv_{dataset_label}", "raw", len(df_upload), random.randint(300, 900))
                     st.session_state.lake["jobs"].append(job)
                 st.success(f"✅ Ingested `{name}` → {len(df_upload):,} rows")
 
@@ -613,6 +586,8 @@ elif section == "🏗️ Lake Zones":
             data = st.session_state.lake[zone]
             if not data:
                 st.info(f"No datasets in {label} zone yet.")
+                if zone == "raw":
+                    st.info("💡 Go to **Data Ingestion** tab to load the Flipkart dataset.")
                 continue
 
             st.markdown(f"**{len(data)} dataset(s) in {label} zone**")
@@ -642,25 +617,49 @@ elif section == "🏗️ Lake Zones":
                         nz = next_zones[zone]
                         if st.button(f"⬆️ Promote to {nz.upper()}", key=f"promote_{zone}_{name}"):
                             with st.spinner(f"Transforming to {nz}..."):
-                                time.sleep(0.5)
-                                # Simple transformation logic
+                                time.sleep(0.7)
                                 df_t = df.copy()
+                                
+                                # Zone-specific transformations
                                 if nz == "bronze":
-                                    df_t = df_t.dropna()
-                                    df_t = df_t.drop_duplicates()
+                                    # Clean nulls, duplicates, parse prices
+                                    df_t = df_t.dropna(subset=['pid', 'title'])
+                                    df_t = df_t.drop_duplicates(subset=['pid'])
+                                    if 'actual_price_clean' not in df_t.columns:
+                                        if 'actual_price' in df_t.columns:
+                                            df_t['actual_price_clean'] = df_t['actual_price'].str.replace('₹', '').str.replace(',', '')
+                                            df_t['actual_price_clean'] = pd.to_numeric(df_t['actual_price_clean'], errors='coerce')
+                                        if 'selling_price' in df_t.columns:
+                                            df_t['selling_price_clean'] = df_t['selling_price'].str.replace('₹', '').str.replace(',', '')
+                                            df_t['selling_price_clean'] = pd.to_numeric(df_t['selling_price_clean'], errors='coerce')
+                                    
                                 elif nz == "silver":
-                                    df_t = df_t.dropna()
-                                    if "unit_price" in df_t.columns and "quantity" in df_t.columns:
-                                        df_t["revenue"] = df_t["unit_price"] * df_t["quantity"]
-                                    if "discount_pct" in df_t.columns and "unit_price" in df_t.columns:
-                                        df_t["discounted_price"] = df_t["unit_price"] * (1 - df_t["discount_pct"] / 100)
+                                    # Add business metrics
+                                    if 'actual_price_clean' in df_t.columns and 'selling_price_clean' in df_t.columns:
+                                        df_t['price_savings'] = df_t['actual_price_clean'] - df_t['selling_price_clean']
+                                        df_t['discount_pct_calc'] = ((df_t['actual_price_clean'] - df_t['selling_price_clean']) / df_t['actual_price_clean'] * 100).round(2)
+                                    if 'average_rating' in df_t.columns:
+                                        df_t['rating_category'] = pd.cut(
+                                            df_t['average_rating'], 
+                                            bins=[0, 2, 3, 4, 5], 
+                                            labels=['Poor', 'Fair', 'Good', 'Excellent']
+                                        )
+                                    
                                 elif nz == "gold":
-                                    if "category" in df_t.columns and "revenue" in df_t.columns:
-                                        df_t = df_t.groupby("category").agg({"revenue": "sum", "quantity": "sum"}).reset_index()
+                                    # Aggregate by category
+                                    if 'category' in df_t.columns and 'selling_price_clean' in df_t.columns:
+                                        df_t = df_t.groupby('category').agg({
+                                            'pid': 'count',
+                                            'selling_price_clean': ['mean', 'median', 'min', 'max'],
+                                            'average_rating': 'mean',
+                                            'discount_pct_calc': 'mean' if 'discount_pct_calc' in df_t.columns else 'first'
+                                        }).round(2)
+                                        df_t.columns = ['product_count', 'avg_price', 'median_price', 'min_price', 'max_price', 'avg_rating', 'avg_discount']
+                                        df_t = df_t.reset_index()
                                     else:
-                                        df_t = df_t.head(50)  # sample
+                                        df_t = df_t.head(100)
 
-                                new_name = name.replace(f"{zone}_", "") if zone in name else name
+                                new_name = name.replace(f"{zone}_", "")
                                 ts = datetime.datetime.now().strftime("%H%M%S")
                                 dest_name = f"{nz}_{new_name}_{ts}"
                                 st.session_state.lake[nz][dest_name] = df_t
@@ -685,7 +684,7 @@ elif section == "🏗️ Lake Zones":
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ── SECTION 4: QUERY ENGINE ─────────────────────────────────────────────────
+# ── SECTION 4: QUERY ENGINE ──────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 elif section == "🔍 Query Engine":
     st.markdown("# 🔍 Query Engine")
@@ -717,14 +716,16 @@ elif section == "🔍 Query Engine":
 
         with col2:
             st.markdown("**Query (pandas expression)**")
-            st.caption("Use `df` to reference the selected dataset. Example: `df[df['status'] == 'completed'].groupby('category')['unit_price'].mean()`")
+            st.caption("Use `df` to reference the selected dataset.")
 
             query_presets = {
-                "Row count by category": "df.groupby('category').size().reset_index(name='count').sort_values('count', ascending=False)" if "category" in df.columns else "df.head()",
                 "Top 10 rows": "df.head(10)",
+                "Products by category": "df.groupby('category').size().reset_index(name='count').sort_values('count', ascending=False)" if "category" in df.columns else "df.head()",
+                "Top brands": "df.groupby('brand')['selling_price_clean'].mean().sort_values(ascending=False).head(10).reset_index()" if "brand" in df.columns and "selling_price_clean" in df.columns else "df.head()",
+                "High discount products": "df.nlargest(20, 'discount_pct_calc')[['title', 'brand', 'discount_pct_calc', 'selling_price_clean']]" if "discount_pct_calc" in df.columns else "df.head()",
+                "Rating distribution": "df['average_rating'].value_counts().sort_index().reset_index()" if "average_rating" in df.columns else "df.head()",
                 "Statistical summary": "df.describe()",
                 "Null value counts": "df.isnull().sum().reset_index().rename(columns={0:'nulls','index':'column'})",
-                "Value counts (first col)": f"df['{df.columns[0]}'].value_counts().head(20).reset_index()",
             }
 
             preset = st.selectbox("Quick Queries", ["Custom..."] + list(query_presets.keys()))
@@ -793,7 +794,7 @@ elif section == "📋 Data Catalog":
     st.markdown("Searchable metadata registry for all datasets in the lake.")
 
     if not st.session_state.lake["catalog"]:
-        st.info("Catalog is empty. Ingest some data to populate it.")
+        st.info("Catalog is empty. Ingest the Flipkart data to populate it.")
     else:
         # Search & filter
         col1, col2 = st.columns([2, 1])
@@ -833,9 +834,9 @@ elif section == "📋 Data Catalog":
                 st.markdown(f"**Tags:** {tag_html}", unsafe_allow_html=True)
 
                 schema_items = entry.get("schema", [])
-                if schema_items:
+                if schema_items and len(schema_items) > 0:
                     schema_df = pd.DataFrame(schema_items, columns=["Column", "Dtype"])
-                    st.dataframe(schema_df, use_container_width=True, hide_index=True)
+                    st.dataframe(schema_df.head(20), use_container_width=True, hide_index=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -856,7 +857,6 @@ elif section == "🔗 Data Lineage":
 
         # Sankey diagram
         st.markdown("### 🌊 Data Flow Diagram (Sankey)")
-        operations = lineage_df["operation"].value_counts()
 
         # Build sankey
         all_nodes = list(set(lineage_df["source"].tolist() + lineage_df["destination"].tolist()))
@@ -864,7 +864,7 @@ elif section == "🔗 Data Lineage":
 
         sankey_colors = []
         for n in all_nodes:
-            if "raw/" in n or n == "synthetic-generator" or "csv" in n.lower():
+            if "raw/" in n or "flipkart" in n.lower() or "api" in n.lower():
                 sankey_colors.append("#9b59b6")
             elif "bronze/" in n:
                 sankey_colors.append("#cd7f32")
@@ -879,7 +879,7 @@ elif section == "🔗 Data Lineage":
             node=dict(
                 pad=15, thickness=15,
                 line=dict(color="#1e3060", width=0.5),
-                label=[n[:30] + ("..." if len(n) > 30 else "") for n in all_nodes],
+                label=[n[:35] + ("..." if len(n) > 35 else "") for n in all_nodes],
                 color=sankey_colors,
                 hovertemplate="%{label}<extra></extra>",
             ),
@@ -917,17 +917,17 @@ elif section == "⚡ ETL Pipeline":
     raw_datasets = list(st.session_state.lake["raw"].keys())
 
     if not raw_datasets:
-        st.warning("⚠️ No raw datasets available. Ingest data first.")
+        st.warning("⚠️ No raw datasets available. Load Flipkart data first.")
     else:
         st.markdown("### 🚀 Run Full Pipeline")
         selected_raw = st.selectbox("Select Raw Dataset", raw_datasets)
         pipe_cols = st.columns(4)
 
         steps = [
-            ("🌊→🥉 Ingest", "bronze", "Clean & validate"),
-            ("🥉→🥈 Transform", "silver", "Enrich & join"),
+            ("🌊→🥉 Clean", "bronze", "Parse & validate"),
+            ("🥉→🥈 Enrich", "silver", "Add metrics"),
             ("🥈→🥇 Aggregate", "gold", "Compute KPIs"),
-            ("🥇 Publish", "gold", "Expose to BI"),
+            ("🥇 Publish", "gold", "BI-ready"),
         ]
 
         for col, (step_label, zone, desc) in zip(pipe_cols, steps):
@@ -941,43 +941,54 @@ elif section == "⚡ ETL Pipeline":
             )
 
         st.markdown("")
-        if st.button("▶▶ RUN FULL PIPELINE", use_container_width=True):
+        if st.button("▶▶ RUN FULL PIPELINE", use_container_width=True, type="primary"):
             df_src = st.session_state.lake["raw"][selected_raw]
             ts = datetime.datetime.now().strftime("%H%M%S")
             progress = st.progress(0, "Initializing...")
             status_box = st.empty()
 
             pipeline_stages = [
-                ("Bronze: Clean & Validate", "bronze", lambda d: d.dropna().drop_duplicates()),
+                ("Bronze: Clean & Validate", "bronze", lambda d: d.dropna(subset=['pid']).drop_duplicates(subset=['pid'])),
                 ("Silver: Enrich & Transform", "silver", lambda d: (
-                    d.assign(revenue=d["unit_price"] * d["quantity"]) if "unit_price" in d.columns and "quantity" in d.columns else d
+                    d.assign(
+                        price_savings=d['actual_price_clean'] - d['selling_price_clean'],
+                        discount_pct_calc=((d['actual_price_clean'] - d['selling_price_clean']) / d['actual_price_clean'] * 100).round(2)
+                    ) if 'actual_price_clean' in d.columns and 'selling_price_clean' in d.columns else d
                 )),
                 ("Gold: Aggregate KPIs", "gold", lambda d: (
-                    d.groupby("category").agg({"revenue": "sum", "quantity": "sum"}).reset_index()
-                    if "category" in d.columns and "revenue" in d.columns else d.describe()
+                    d.groupby('category').agg({
+                        'pid': 'count',
+                        'selling_price_clean': ['mean', 'min', 'max'],
+                        'average_rating': 'mean',
+                        'discount_pct_calc': 'mean' if 'discount_pct_calc' in d.columns else 'first'
+                    }).round(2).reset_index()
+                    if 'category' in d.columns and 'selling_price_clean' in d.columns else d.describe()
                 )),
             ]
 
             current_df = df_src
             for i, (stage_name, zone, transform_fn) in enumerate(pipeline_stages):
                 status_box.info(f"⚙️ Running: **{stage_name}**...")
-                time.sleep(0.6)
+                time.sleep(0.8)
                 try:
                     current_df = transform_fn(current_df)
-                except Exception:
+                except Exception as e:
+                    st.warning(f"Transformation partially failed: {e}. Using fallback.")
                     current_df = current_df.head(100)
 
                 dest_name = f"{zone}_{selected_raw}_{ts}"
                 st.session_state.lake[zone][dest_name] = current_df
                 entry = make_catalog_entry(dest_name, zone.upper(), list(current_df.dtypes.astype(str).items()), len(current_df), "etl-pipeline")
                 st.session_state.lake["catalog"].append(entry)
-                lin = make_lineage_event(f"pipeline_input", f"{zone}/{dest_name}", stage_name, len(current_df))
+                lin = make_lineage_event(f"pipeline_stage_{i}", f"{zone}/{dest_name}", stage_name, len(current_df))
                 st.session_state.lake["lineage"].append(lin)
-                job = make_job(stage_name, zone, len(current_df), random.randint(400, 3000))
+                job = make_job(stage_name, zone, len(current_df), random.randint(600, 4000))
                 st.session_state.lake["jobs"].append(job)
                 progress.progress((i + 1) / len(pipeline_stages), f"Completed: {stage_name}")
 
             status_box.success("✅ Full pipeline completed successfully!")
+            st.balloons()
+            time.sleep(1)
             st.rerun()
 
     # Job History
@@ -1018,150 +1029,132 @@ elif section == "⚡ ETL Pipeline":
 # ─────────────────────────────────────────────────────────────────────────────
 elif section == "📊 Analytics":
     st.markdown("# 📊 Analytics Dashboard")
-    st.markdown("Business intelligence views powered by the Gold Zone.")
+    st.markdown("Business intelligence views powered by the Flipkart dataset.")
 
-    # Auto-load sample data for demo
-    if not any(st.session_state.lake["raw"].values()):
-        with st.spinner("Loading demo data for analytics..."):
-            orders_df = generate_orders(1000)
-            customers_df = generate_customers(200)
-            products_df = generate_products(150)
-            st.session_state.lake["raw"]["demo_orders"] = orders_df
-            st.session_state.lake["raw"]["demo_customers"] = customers_df
-            st.session_state.lake["raw"]["demo_products"] = products_df
+    # Check if we have data
+    if not st.session_state.lake["raw"] and not st.session_state.source_data_loaded:
+        st.warning("⚠️ No data loaded yet. Go to **Data Ingestion** to load the Flipkart dataset.")
+    else:
+        # Load fresh data for analytics
+        df = load_flipkart_data()
+        
+        # KPIs
+        st.markdown("### 🔑 Key Performance Indicators")
+        k1, k2, k3, k4, k5 = st.columns(5)
+        k1.metric("Total Products", f"{len(df):,}", "30K catalog")
+        k2.metric("Avg Rating", f"{df['average_rating'].mean():.2f} ⭐", "+0.08")
+        k3.metric("Avg Discount", f"{df['discount_pct'].mean():.1f}%", "-2.3%")
+        k4.metric("Avg Price", f"₹{df['selling_price_clean'].mean():,.0f}", "+5.2%")
+        k5.metric("Out of Stock", f"{df['out_of_stock'].sum():,}", f"{(df['out_of_stock'].sum()/len(df)*100):.1f}%")
 
-    # Use orders for analytics
-    orders_df = generate_orders(1000)
-    orders_df["revenue"] = orders_df["unit_price"] * orders_df["quantity"] * (1 - orders_df["discount_pct"] / 100)
-    orders_df["order_month"] = pd.to_datetime(orders_df["order_date"]).dt.to_period("M").astype(str)
+        st.divider()
 
-    # KPIs
-    st.markdown("### 🔑 Key Performance Indicators")
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("Total Revenue", f"${orders_df['revenue'].sum():,.0f}", "+12.4%")
-    k2.metric("Total Orders", f"{len(orders_df):,}", "+8.1%")
-    k3.metric("Avg Order Value", f"${orders_df['revenue'].mean():.2f}", "+3.6%")
-    k4.metric("Return Rate", f"{orders_df['return_flag'].mean()*100:.1f}%", "-0.5%")
-    k5.metric("Avg Rating", f"{orders_df['customer_rating'].mean():.2f} ⭐", "+0.12")
+        # Charts Row 1
+        col1, col2 = st.columns(2)
 
-    st.divider()
+        with col1:
+            st.markdown("#### 📦 Products by Category")
+            cat_counts = df['category'].value_counts().head(10).reset_index()
+            cat_counts.columns = ['category', 'count']
+            fig_cat = px.bar(cat_counts, x='count', y='category', orientation='h',
+                             color='count', color_continuous_scale=["#1a3a7a", "#5ce0ff"])
+            fig_cat.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#8899cc", family="JetBrains Mono"),
+                margin=dict(t=10, b=0, l=0, r=0), height=320,
+                coloraxis_showscale=False,
+                xaxis=dict(gridcolor="#1a2a44"),
+                yaxis=dict(gridcolor="#1a2a44"),
+            )
+            st.plotly_chart(fig_cat, use_container_width=True)
 
-    # Charts Row 1
-    col1, col2 = st.columns(2)
+        with col2:
+            st.markdown("#### 💰 Price Distribution")
+            fig_price = px.histogram(df[df['selling_price_clean'] < 10000], 
+                                    x='selling_price_clean', nbins=50,
+                                    color_discrete_sequence=["#5ce0ff"])
+            fig_price.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#8899cc", family="JetBrains Mono"),
+                margin=dict(t=10, b=0, l=0, r=0), height=320,
+                xaxis=dict(gridcolor="#1a2a44", title="Selling Price (₹)"),
+                yaxis=dict(gridcolor="#1a2a44", title="Count"),
+                bargap=0.05,
+            )
+            st.plotly_chart(fig_price, use_container_width=True)
 
-    with col1:
-        st.markdown("#### 📈 Monthly Revenue Trend")
-        monthly = orders_df.groupby("order_month")["revenue"].sum().reset_index()
-        fig_rev = px.area(monthly, x="order_month", y="revenue",
-                          color_discrete_sequence=["#5ce0ff"])
-        fig_rev.update_traces(fill="tozeroy", fillcolor="rgba(92,224,255,0.1)")
-        fig_rev.update_layout(
+        # Charts Row 2
+        col3, col4 = st.columns(2)
+
+        with col3:
+            st.markdown("#### ⭐ Rating Distribution")
+            rating_dist = df['average_rating'].value_counts().sort_index().reset_index()
+            rating_dist.columns = ['rating', 'count']
+            fig_rating = px.line(rating_dist, x='rating', y='count', markers=True,
+                                color_discrete_sequence=["#ffd700"])
+            fig_rating.update_traces(line=dict(width=3), marker=dict(size=8))
+            fig_rating.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#8899cc", family="JetBrains Mono"),
+                margin=dict(t=10, b=0, l=0, r=0), height=280,
+                xaxis=dict(gridcolor="#1a2a44", title="Rating"),
+                yaxis=dict(gridcolor="#1a2a44", title="Products"),
+            )
+            st.plotly_chart(fig_rating, use_container_width=True)
+
+        with col4:
+            st.markdown("#### 🏷️ Top 10 Brands by Product Count")
+            brand_counts = df['brand'].value_counts().head(10).reset_index()
+            brand_counts.columns = ['brand', 'count']
+            fig_brand = px.bar(brand_counts, x='brand', y='count',
+                              color='count', color_continuous_scale=["#a8b8c8", "#3dffa0"])
+            fig_brand.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#8899cc", family="JetBrains Mono"),
+                margin=dict(t=10, b=0, l=0, r=0), height=280,
+                coloraxis_showscale=False,
+                xaxis=dict(gridcolor="#1a2a44", tickangle=-45),
+                yaxis=dict(gridcolor="#1a2a44"),
+            )
+            st.plotly_chart(fig_brand, use_container_width=True)
+
+        # Discount vs Rating scatter
+        st.markdown("#### 🎯 Discount % vs Average Rating (Top 1000 products)")
+        scatter_df = df[df['discount_pct'] > 0].head(1000)
+        fig_scatter = px.scatter(scatter_df, x='discount_pct', y='average_rating',
+                                color='category', size='selling_price_clean',
+                                hover_data=['brand', 'title'],
+                                opacity=0.6)
+        fig_scatter.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#8899cc", family="JetBrains Mono"),
-            margin=dict(t=10, b=0, l=0, r=0), height=270,
-            xaxis=dict(gridcolor="#1a2a44", tickangle=-45),
-            yaxis=dict(gridcolor="#1a2a44", tickprefix="$"),
-        )
-        st.plotly_chart(fig_rev, use_container_width=True)
-
-    with col2:
-        st.markdown("#### 🏷️ Revenue by Category")
-        cat_rev = orders_df.groupby("category")["revenue"].sum().sort_values(ascending=True).reset_index()
-        fig_cat = px.bar(cat_rev, x="revenue", y="category", orientation="h",
-                         color="revenue", color_continuous_scale=["#1a3a7a", "#5ce0ff"])
-        fig_cat.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#8899cc", family="JetBrains Mono"),
-            margin=dict(t=10, b=0, l=0, r=0), height=270,
-            coloraxis_showscale=False,
-            xaxis=dict(gridcolor="#1a2a44", tickprefix="$"),
-            yaxis=dict(gridcolor="#1a2a44"),
-        )
-        st.plotly_chart(fig_cat, use_container_width=True)
-
-    # Charts Row 2
-    col3, col4 = st.columns(2)
-
-    with col3:
-        st.markdown("#### 🌍 Orders by Region")
-        region_df = orders_df.groupby("region").size().reset_index(name="orders")
-        fig_pie = px.pie(region_df, names="region", values="orders",
-                         hole=0.5, color_discrete_sequence=["#5ce0ff", "#a8b8c8", "#ffd700", "#cd7f32", "#3dffa0"])
-        fig_pie.update_traces(textfont_color="#d4daf0", textfont_size=11)
-        fig_pie.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#8899cc", family="JetBrains Mono"),
-            margin=dict(t=10, b=0, l=0, r=0), height=280,
+            margin=dict(t=10, b=0, l=0, r=0), height=400,
+            xaxis=dict(gridcolor="#1a2a44", title="Discount %"),
+            yaxis=dict(gridcolor="#1a2a44", title="Average Rating"),
             legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#8899cc")),
         )
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_scatter, use_container_width=True)
 
-    with col4:
-        st.markdown("#### 💳 Payment Method Mix")
-        pay_df = orders_df.groupby("payment_method")["revenue"].sum().reset_index()
-        fig_pay = px.bar(pay_df, x="payment_method", y="revenue",
-                         color="payment_method",
-                         color_discrete_sequence=["#5ce0ff", "#3dffa0", "#ffd700", "#ff7eb3", "#a8b8c8"])
-        fig_pay.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#8899cc", family="JetBrains Mono"),
-            margin=dict(t=10, b=0, l=0, r=0), height=280,
-            showlegend=False,
-            xaxis=dict(gridcolor="#1a2a44"),
-            yaxis=dict(gridcolor="#1a2a44", tickprefix="$"),
+        # Gold summary
+        st.divider()
+        st.markdown("#### 📋 Category Summary (Gold Layer)")
+        gold_summary = df.groupby('category').agg({
+            'pid': 'count',
+            'selling_price_clean': ['mean', 'median', 'min', 'max'],
+            'average_rating': 'mean',
+            'discount_pct': 'mean',
+            'out_of_stock': 'sum'
+        }).round(2)
+        gold_summary.columns = ['product_count', 'avg_price', 'median_price', 'min_price', 'max_price', 'avg_rating', 'avg_discount', 'out_of_stock_count']
+        gold_summary = gold_summary.reset_index().sort_values('product_count', ascending=False).head(20)
+        
+        st.dataframe(gold_summary, use_container_width=True, hide_index=True)
+
+        csv_buf = io.StringIO()
+        gold_summary.to_csv(csv_buf, index=False)
+        st.download_button(
+            "💾 Export Gold Summary CSV",
+            csv_buf.getvalue(),
+            file_name="flipkart_gold_summary.csv",
+            mime="text/csv"
         )
-        st.plotly_chart(fig_pay, use_container_width=True)
-
-    # Heatmap
-    st.markdown("#### 🔥 Category × Region Revenue Heatmap")
-    heat_df = orders_df.groupby(["category", "region"])["revenue"].sum().unstack(fill_value=0)
-    fig_heat = px.imshow(
-        heat_df,
-        color_continuous_scale=["#0a0e1a", "#1a3a7a", "#5ce0ff"],
-        text_auto=".0f",
-        aspect="auto",
-    )
-    fig_heat.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#8899cc", family="JetBrains Mono"),
-        margin=dict(t=10, b=0, l=0, r=0), height=340,
-    )
-    st.plotly_chart(fig_heat, use_container_width=True)
-
-    # Order Status Funnel
-    st.markdown("#### 🔽 Order Status Distribution")
-    status_df = orders_df["status"].value_counts().reset_index()
-    status_df.columns = ["status", "count"]
-    fig_funnel = go.Figure(go.Funnel(
-        y=status_df["status"],
-        x=status_df["count"],
-        marker_color=["#5ce0ff", "#3dffa0", "#ffd700", "#ff7eb3", "#ffb83d"],
-        textinfo="value+percent total",
-    ))
-    fig_funnel.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#8899cc", family="JetBrains Mono"),
-        margin=dict(t=10, b=0, l=0, r=0), height=280,
-    )
-    st.plotly_chart(fig_funnel, use_container_width=True)
-
-    # Downloadable summary
-    st.divider()
-    summary = orders_df.groupby("category").agg(
-        revenue=("revenue", "sum"),
-        orders=("order_id", "count"),
-        avg_rating=("customer_rating", "mean"),
-        return_rate=("return_flag", "mean"),
-    ).round(2).reset_index()
-
-    st.markdown("#### 📋 Category Summary (Gold Layer)")
-    st.dataframe(summary, use_container_width=True, hide_index=True)
-
-    csv_buf = io.StringIO()
-    summary.to_csv(csv_buf, index=False)
-    st.download_button(
-        "💾 Export Gold Summary CSV",
-        csv_buf.getvalue(),
-        file_name="ecommerce_gold_summary.csv",
-        mime="text/csv"
-    )
